@@ -1,0 +1,50 @@
+CC=ppc_6xx-gcc ./configure --host=ppc-linux --prefix=/home/wangxiumei/ppcworkspace/snmpworkspace/aaa/ --enable-mini-agent --disable-ipv6 -with-endianness=big --disable-manuals --disable-scripts --without-crypto
+
+--disable-scripts   指定不安装Perl脚本，没有mib2c文件
+编译net-snmp-5.1.4时只要按照那篇移植文档进行编译即可。使用ppc-6xx-gcc编译没有问题。
+编译openssl0.9.8时
+
+
+./configure --host=ppc-linux --prefix=/home/wangxiumei/ppcworkspace/snmpworkspace/snmp_build/  --disable-ipv6 --with-endianness=big --disable-manuals --enable-embedded-perl --without-rpm
+
+交叉编译完成后，将snmpd放入开发板。指定启动配置脚本目录及mib库目录即可。如果没有mib库，则可以不指定。直接启动snmpd即可。命令如下：
+snmpd -f -Lo
+或
+snmpd -f -Lo -c /mydir/snmpd.conf -m /mydir/mib/
+
+在x86上编译snmpd并安装命令如下：
+./configure --prefix=/usr/local --libdir=/usr/local/lib --without-rpm --enable-embedded-perl --with-logfile=/usr/local/var/log/snmpd.log --with-persistent-directory=/usr/local/var/net-snmp --without-perl-modules
+
+sudo make
+sudo make install
+x86上的snmpd.conf文件可由snmpconf工具生成。
+在提示下生成所需snmpd.conf后，放到～/.snmp/snmpd.conf
+
+由于mib2c用perl解析所以要安装perl脚本
+在net-snmp-5.7.1源码目录下进入perl目录
+执行如下命令。
+perl Makefile.PL
+sudo make 
+sudo make install
+会在/usr/local/lib/perl/5.10.1下生成perl相关内容
+
+
+snmp常用命令使用方法
+
+snmptranslate -On SNMPv2-MIB::system	OID形式显示
+snmptranslate -Of SNMPv2-MIB::system	符号形式显示，必须有相应的MIB库才行
+snmptranslate -Tp SNMPv2-MIB::system	树型结构显示
+
+snmpget -v(版本号1/2c/3) -c(community) IPaddr:Port OID
+直接指定OID号
+snmpget -v2c -c public 192.168.1.5:4161 1.3.6.1.2.1.333.1.0
+以MIB库的名字指定，要指出库的名字。
+snmpget -v1 -c public localhost:4161 -m ./TEST-MIB.txt TEST-MIB::testHello.0
+
+mib2c使用
+假如当前目录下有一个mib源文件TEST-MIB.txt,库文件中包含testHello类型变量。（testHello只是一种类型，如果定义为INTEGER，则testHello就相当于int，具体的变量名从0开始）
+MIBS=+./TEST-MIB.txt mib2c TEST-MIB::testHello
+
+在snmpd.conf文件下可通过设置dlmod testHello /mydir/testHello.so来指定编译生成的动态库。
+编译命令如下：
+gcc `net-snmp-config --cflags` -fPIC -shared -g -O0 -o testHello.so testHello.c `net-snmp-config --libs`

@@ -1,0 +1,135 @@
+
+在x86上编译snmpd并安装命令如下：
+./configure --prefix=/usr/local --libdir=/usr/local/lib --without-rpm --enable-embedded-perl --with-logfile=/usr/local/var/log/snmpd.log --with-persistent-directory=/usr/local/var/net-snmp --without-perl-modules
+ 当不安装在系统目录下时，安装net-snmp5.7.3执行如下命令
+./configure --prefix=/home/wangxiumei/mywork/netmgt/snmp/build  --without-rpm --enable-embedded-perl --with-logfile=/home/wangxiumei/mywork/netmgt/snmp/build/var/log/snmpd.log --with-persistent-directory=/home/wangxiumei/mywork/netmgt/snmp/build/var/net-snmp --without-perl-modules --with-default-snmp-version="2" --with-sys-contact="wangxiumei_ryx@163.com" --with-sys-location="china"
+
+sudo make
+sudo make install
+卸载已安装文件
+sudo make uninstall
+x86上的snmpd.conf文件可由snmpconf工具生成。
+在提示下生成所需snmpd.conf后，放到～/.snmp/snmpd.conf
+
+启动snmpd服务命令如下：
+snmpd -f -Lo
+或
+snmpd -f -Lo -c /mydir/snmpd.conf
+（注意：mydir是自己放置的目录路径如：~/.snmp/）
+
+由于mib2c用perl解析所以要安装perl脚本
+在net-snmp-5.7.1源码目录下进入perl目录
+执行如下命令。
+perl Makefile.PL
+sudo make 
+sudo make install
+会在/usr/local/lib/perl/5.10.1下生成perl相关内容
+在编译net-snmp-5.7.3时，进入perl目录，执行如下命令
+perl Makefile.PL  -NET-SNMP-IN-SOURCE=true
+make
+sudo make install
+会在/usr/local/lib/perl/5.14.2下生成perl相关内容
+
+验证snmpd服务是否工作正常：
+snmpget -v2c -c public localhost sysDescr.0
+
+snmp常用命令使用方法
+
+snmptranslate -On SNMPv2-MIB::system	OID形式显示
+snmptranslate -Of SNMPv2-MIB::system	符号形式显示，必须有相应的MIB库才行
+snmptranslate -Tp SNMPv2-MIB::system	树型结构显示
+
+snmpget -v(版本号1/2c/3) -c(community) IPaddr:Port OID
+直接指定OID号
+snmpget -v2c -c public 192.168.1.5:4161 1.3.6.1.2.1.333.1.0
+能显示出MIB库名字的命令如下：
+snmpget -v1 -c public localhost:4161 -m ./TEST-MIB.txt TEST-MIB::testHello.0
+snmpwalk命令使用
+snmpwalk -v2c -c public localhost:4161 -m ./TEST-MIB.txt TEST-MIB::testHello.0
+
+mib2c使用
+假如当前目录下有一个mib源文件TEST-MIB.txt,库文件中包含testHello类型变量。（testHello只是一种类型，如果定义为INTEGER，则testHello就相当于int，具体的变量名从0开始）
+MIBS=+./TEST-MIB.txt mib2c TEST-MIB::testHello
+MIBS=+../RAYCORES-MIBv1.txt /home/wangxiumei/mywork/netmgt/snmp/build/bin/mib2c RAYCORES-MIBv1::e1PhyMibPortInfoStatTable
+一般默认选2 2 1 2.
+
+在snmpd.conf文件下可通过设置dlmod testHello /mydir/testHello.so来指定编译生成的动态库。
+编译命令如下：
+gcc `net-snmp-config --cflags` -fPIC -shared -g -O0 -o testHello.so testHello.c `net-snmp-config --libs`
+
+
+
+
+以上都是针对snmpget方面的配置，如果要使用snmpset则需要进行如下配置：
+在snmpd.conf文件中加入一行配置：
+rwcommunity private
+
+即可使用snmpset进行设置了。
+设置例子如下：
+snmpset -v2c -c private localhost:4161  1.3.6.1.4.1.1333.1.0 i 3
+
+1.3.6.1.4.1.1333.1 = SNMPv2-SMI::enterprises.1333.1
+
+
+snmptranslate 1.3.6.1.4.1.1333.1 -m ./TEST-MIB.txt
+TEST-MIB::intTest
+snmptranslate -Of 1.3.6.1.4.1.1333.1 -m ./TEST-MIB.txt
+.iso.org.dod.internet.private.enterprises.writeTest.intTest
+
+
+
+other learn information
+
+snmpd包含很多启动命令，可通过snmpd -H来查看配置文件可以配置的命令。
+比如：
+snmpd -f -Lo -c /home/xxx/snmpd.conf
+-L 代表日志的输出方式
+-Lo 标准输出
+-Le 标准错误输出
+-Ls 以系统日志的方式输出
+-Lf 加文件名，日志输出到指定文件中
+-m 指定MIBLIST文件，代替原来的MIBLIST
+-M 指定MIB目录，代替原来的MIBLIST目录
+
+我们可以在snmpd.conf文件中配置这些选项，（通过snmpd -H查看支持的命令字）
+authtrapenable  使能v1还是v2trap
+trapsink
+trap2sink
+informsink
+trapcommunity
+agentuser
+agentgroup
+agentaddress
+group
+access
+setaccess
+view
+authcommunity
+authuser
+authgroup
+authaccess
+rwcommunity
+rocommunity
+rwuser
+rouser
+sysdescr
+syslocation
+syscontact
+sysname
+dlmod
+notificationEvent
+setEvent
+mibs
+mibdirs
+mibfile
+logoption
+
+等命令可以找个例子进行参考配置
+
+ubuntu 系统安装snmpd服务
+sudo apt-get install snmpd
+ps -ef | grep snmpd
+/usr/sbin/snmpd -Lsd -Lf /dev/null -u snmp -g snmp -I -smux -p /var/run/snmpd.pid
+卸载snmpd系统服务
+sudo apt-get autoremove snmpd
+
